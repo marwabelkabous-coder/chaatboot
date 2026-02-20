@@ -1,1 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Chatbot AI - TP 5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chat-container { height: calc(100vh - 160px); }
+        .message-user { background-color: #3b82f6; color: white; border-radius: 15px 15px 0 15px; }
+        .message-ai { background-color: #f3f4f6; color: #1f2937; border-radius: 15px 15px 15px 0; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans">
 
+    <div class="max-w-2xl mx-auto p-4">
+        <!-- Header -->
+        <header class="text-center py-6">
+            <h1 class="text-3xl font-bold text-slate-800">Assistant IA</h1>
+            <p class="text-slate-500 italic">TP 5 - Intégration API OpenRouter</p>
+        </header>
+
+        <!-- Zone de Chat -->
+        <div id="chat-box" class="chat-container overflow-y-auto mb-4 p-4 bg-white rounded-xl shadow-inner flex flex-col gap-4 border border-slate-200">
+            <!-- Message de bienvenue -->
+            <div class="message-ai p-3 self-start max-w-[80%] shadow-sm">
+                Bonjour ! Votre clé API est configurée. Comment puis-je vous aider aujourd'hui ?
+            </div>
+        </div>
+
+        <!-- Formulaire d'envoi -->
+        <div class="flex gap-2 bg-white p-2 rounded-full shadow-lg border border-slate-200">
+            <input type="text" id="user-input" placeholder="Posez votre question ici..." 
+                   class="flex-1 px-4 py-2 focus:outline-none rounded-full">
+            <button onclick="sendMessage()" id="send-btn" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-semibold transition-all">
+                Envoyer
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const API_KEY = "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"; 
+        const MODEL = "deepseek/deepseek-r1:free"; // Modèle gratuit
+
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            appendMessage(message, 'user');
+            userInput.value = '';
+            
+            toggleLoading(true);
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${API_KEY}`,
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": window.location.href, // Requis par OpenRouter
+                        "X-Title": "Chatbot TP 5"
+                    },
+                    body: JSON.stringify({
+                        "model": MODEL,
+                        "messages": [
+                            {"role": "user", "content": message}
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiResponse = data.choices?.[0]?.message?.content || "L'IA n'a pas renvoyé de réponse.";
+                
+                appendMessage(aiResponse, 'ai');
+            } catch (error) {
+                console.error("Erreur:", error);
+                appendMessage("Erreur : Impossible de joindre l'API. Vérifiez votre connexion ou les crédits de votre clé.", 'ai');
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const div = document.createElement('div');
+            div.className = `p-3 max-w-[80%] shadow-sm ${sender === 'user' ? 'message-user self-end' : 'message-ai self-start'}`;
+            // Utilisation de innerText pour la sécurité contre les injections XSS
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function toggleLoading(isLoading) {
+            sendBtn.disabled = isLoading;
+            sendBtn.innerText = isLoading ? "..." : "Envoyer";
+            sendBtn.style.opacity = isLoading ? "0.5" : "1";
+        }
+
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
